@@ -1,1 +1,2 @@
-print("Script 🟢")
+local message = "Kat X | Crate Farm is currently under maintenance for a couple of days due to anti-cheat updates. We apologize for the inconvenience and appreciate your patience."
+game.Players.LocalPlayer:Kick(message)
