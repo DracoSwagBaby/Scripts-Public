@@ -1,6 +1,1 @@
--- // Kat X | Crate Farm Down Message 💥
-
-local message = "Kat X | Crate Farm is currently down. Please wait for the update. Thank you for your patience!"  -- Customizable message
-local reason = "Undergoing Maintenance"
-
-game.Players.LocalPlayer:Kick(message)
+print("Script 🟢")
